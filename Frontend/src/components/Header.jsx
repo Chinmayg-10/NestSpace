@@ -1,85 +1,74 @@
-import '../App.css';
+import { useContext, useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
+import { ThemeContext } from "../context/ThemeContext";
+import AuthModal from "./AuthModal";
 
-const Header = ({
-  viewMode,
-  setViewMode,
-  isLoggedIn,
-  handleLogout,
-  handleLogin,
-  role,
-  handleAddProperty,
-  handleMyProperties,
-}) => {
+export default function Header() {
+  const { user, setUser, setToken } = useContext(AuthContext);
+  const { theme, toggleTheme } = useContext(ThemeContext);
+  const [authOpen, setAuthOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogout = () => {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/");
+  };
+
+  const buttonClasses = "px-4 py-1 rounded bg-white dark:bg-gray-700 text-primary dark:text-white hover:opacity-90 transition";
+
+  const navLinks = [
+    { name: "Home", path: "/" },
+    { name: "Listings", path: "/listings" },
+  ];
+
   return (
-    <header className="app-header flex justify-between items-center px-6 py-4 bg-white shadow-md">
-      {/* Logo */}
-      <h1 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-        🏠 Real Estate Listings {role ? <span className="text-gray-500 text-lg">({role})</span>: ""}
+    <header className="bg-primary dark:bg-gray-800 text-white p-4 flex justify-between items-center shadow-md">
+      <h1
+        className="text-2xl font-bold cursor-pointer"
+        onClick={() => navigate("/")}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => e.key === "Enter" && navigate("/")}
+      >
+        NestSpace
       </h1>
 
-      {/* Owner-specific buttons */}
-      {role === 'owner' && isLoggedIn && (
-        <div className="flex gap-3 mr-4">
-          <button
-            onClick={handleAddProperty}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm"
+      <nav className="flex items-center gap-4">
+        {navLinks.map((link) => (
+          <Link
+            key={link.path}
+            to={link.path}
+            className={`hover:underline ${location.pathname === link.path ? "font-bold underline" : ""}`}
           >
-            ➕ Add Property
-          </button>
-          <button
-            onClick={handleMyProperties}
-            className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-md text-sm"
-          >
-            📋 My Properties
-          </button>
-        </div>
-      )}
+            {link.name}
+          </Link>
+        ))}
 
-      {/* View Toggle Buttons */}
-      <div className="view-toggle flex gap-2">
         <button
-          className={`px-4 py-2 rounded-md text-sm ${
-            viewMode === 'grid'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700'
-          }`}
-          onClick={() => setViewMode('grid')}
+          onClick={toggleTheme}
+          className="px-3 py-1 bg-white dark:bg-gray-700 text-primary dark:text-white rounded hover:opacity-90 transition"
+          title="Toggle theme"
         >
-          Grid View
+          {theme === "light" ? "🌙" : "☀️"}
         </button>
-        <button
-          className={`px-4 py-2 rounded-md text-sm ${
-            viewMode === 'map'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700'
-          }`}
-          onClick={() => setViewMode('map')}
-        >
-          Map View
-        </button>
-      </div>
 
-      {/* Auth Button */}
-      <div>
-        {isLoggedIn ? (
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm"
-          >
+        {user ? (
+          <button onClick={handleLogout} className={buttonClasses}>
             Logout
           </button>
         ) : (
-          <button
-            onClick={handleLogin}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm"
-          >
-            Login
+          <button onClick={() => setAuthOpen(true)} className={buttonClasses}>
+            Login / Signup
           </button>
         )}
-      </div>
+      </nav>
+
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
     </header>
   );
-};
-
-export default Header;
-
+}

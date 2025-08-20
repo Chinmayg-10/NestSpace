@@ -1,74 +1,99 @@
 const express = require("express");
 const router = express.Router();
+const mongoose=require("mongoose")
 const Property = require("../models/Property");
-const User = require("../models/User"); // For wishlist
+const authMiddleware = require("../middleware/authMiddleware");
+const Schedule=require("../models/ScheduleVisit")
 
-// 1️⃣ Add Property
-router.post("/", async (req, res) => {
-  try {
-    const property = new Property(req.body);
-    await property.save();
-    res.status(201).json({ success: true, data: property });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// 2️⃣ Get all properties
+// Get all properties with optional filters
 router.get("/", async (req, res) => {
   try {
-    const properties = await Property.find();
-    res.json({ data: properties });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const { location, minPrice, maxPrice, bedrooms, type } = req.query;
+    let query = {};
+    if (location) query.location = location;
+    if (bedrooms) query.bedrooms = Number(bedrooms);
+    if (type) query.type = type;
+    if (minPrice || maxPrice) query.price = {};
+    if (minPrice) query.price.$gte = Number(minPrice);
+    if (maxPrice) query.price.$lte = Number(maxPrice);
+
+    const properties = await Property.find(query);
+    res.status(200).json(properties);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch properties", error: error.message });
   }
 });
 
-// 3️⃣ Get properties by owner
-router.get("/owner/:userId", async (req, res) => {
+// Get single property (protected)
+router.get("/:id", authMiddleware, async (req, res) => {
   try {
-    const properties = await Property.find({ ownerId: req.params.userId });
-    res.json({ data: properties });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+    res.status(200).json(property);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch property", error: error.message });
   }
 });
 
-// 4️⃣ Delete a property
-router.delete("/:id", async (req, res) => {
+// Create property (protected)
+router.post("/", authMiddleware, async (req, res) => {
   try {
-    await Property.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const property = await Property.create(req.body);
+    res.status(201).json(property);
+  } catch (error) {
+    res.status(400).json({ message: "Failed to create property", error: error.message });
   }
 });
 
-// 5️⃣ Toggle Wishlist
-router.post("/wishlist/:propertyId", async (req, res) => {
+// Add/remove wishlist (protected)
+router.post("/:id/wishlist", authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.body;
-    const user = await User.findById(userId);
+    const user = req.user;
+    const propertyId = req.params.id;
 
-    if (!user)
-      return res.status(404).json({ success: false, message: "User not found" });
-
-    const propertyId = req.params.propertyId;
-
-    if (user.wishlist.includes(propertyId)) {
-      user.wishlist = user.wishlist.filter((id) => id.toString() !== propertyId);
-    } else {
-      user.wishlist.push(propertyId);
+    if (!user || !user.wishlist) {
+      return res.status(400).json({ message: "User data invalid" });
     }
 
+    const index = user.wishlist.indexOf(propertyId);
+    if (index > -1) {
+      user.wishlist.splice(index, 1); // Remove from wishlist
+    } else {
+      user.wishlist.push(propertyId); // Add to wishlist
+    }
     await user.save();
-    res.json({ success: true, wishlist: user.wishlist });
+    res.status(200).json(user.wishlist);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update wishlist", error: error.message });
+  }
+});
+// Schedule a visit
+router.post("/:id/schedule-visit",authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { date, time } = req.body;
+  const userId = req.user?._id; 
+  if (!date || !time) {
+    return res.status(400).json({ message: "Date and time are required." });
+  }
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid property ID." });
+  }
+  try {
+    // Save schedule in DB
+    const schedule = await Schedule.create({
+      user: userId,
+      property: id,
+      date,
+      time,
+    });
+
+    res.status(201).json({ message: "Visit scheduled successfully", schedule });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 module.exports = router;
-
-
-

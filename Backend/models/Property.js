@@ -1,19 +1,15 @@
-// models/Property.js
 const mongoose = require("mongoose");
 
 const propertySchema = new mongoose.Schema({
   title: String,
-  address: String,
+  description: String,
   price: Number,
-  type: { type: String, enum: ["rent", "sale"] },
+  location: String,
   bedrooms: Number,
   bathrooms: Number,
-  sqft: Number,
-  image: String,
-  description: String,
-  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  createdAt: { type: Date, default: Date.now }
-
+  type: String,
+  images: [String],
+  createdAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model("Property", propertySchema);
